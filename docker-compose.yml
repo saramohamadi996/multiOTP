@@ -1,0 +1,90 @@
+version: '2'
+services:
+  # PHP Service
+  sara1-php:
+    build:
+      context: .
+      dockerfile: app.dockerfile
+    container_name: sara1-php
+    tty: true
+    restart: always
+    environment:
+      SERVICE_NAME: sara1-php
+      SERVICE_TAGS: dev
+    working_dir: /var/www/server
+    volumes:
+      - ./laravel:/var/www/server
+      - ./php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - sara1-network
+    depends_on:
+      - sara1-mysql
+#    command: /bin/bash -c "php-fpm | /usr/bin/supervisord -n -c /etc/supervisor/supervisord.conf"
+    command: /bin/bash -c "php-fpm"
+
+  # Nginx Service
+  sara1-nginx:
+    build:
+      context: ./
+      dockerfile: webserver.dockerfile
+    container_name: sara1-nginx
+    tty: true
+    restart: always
+    ports:
+      - "8082:80"
+    volumes:
+      - ./laravel:/var/www/server
+    depends_on:
+      - sara1-php
+    networks:
+      - sara1-network
+
+  # MySQL Service
+  sara1-mysql:
+    image: mysql:8.0
+    container_name: sara1-mysql
+    restart: always
+    tty: true
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+    ports:
+      - "33068:3306"
+    volumes:
+      - sara1_mysql:/var/lib/mysql/
+      - ./dbs:/docker-entrypoint-initdb.d
+      - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+    networks:
+      - sara1-network
+
+  sara1-phpmyadmin:
+    depends_on:
+      - sara1-mysql
+    image: phpmyadmin/phpmyadmin
+    container_name: sara1-phpmyadmin
+    links:
+      - sara1-mysql
+    environment:
+      PMA_HOST: sara1-mysql
+      MYSQL_ROOT_PASSWORD: password
+    restart: always
+    ports:
+      - "8088:80"
+    networks:
+      - sara1-network
+#redis
+  sara1-redis:
+    image: redis:latest
+    container_name: sara1-redis
+    restart: always
+    volumes:
+      - ./redis/data:/data
+    ports:
+      - "6369:6378"
+
+networks:
+  sara1-network:
+    driver: bridge
+
+volumes:
+  sara1_mysql:
+    driver: local
